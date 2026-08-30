@@ -42,7 +42,7 @@ Multiple ConditionSets may return the same result value. Duplicate results are a
 
 This makes it possible to express OR logic by defining multiple ConditionSets that return the same Result.
 
-
+```
 RuleSet
  ├─ ConditionSet
  │   ├─ Condition
@@ -53,6 +53,7 @@ RuleSet
  │   └─ Result
  └─ ConditionSet
      └─ Result
+```
 
 ## Public API
 
