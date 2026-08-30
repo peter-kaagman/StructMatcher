@@ -268,3 +268,7 @@ The module throws clear errors for contract violations and invalid input, includ
 4. Unsupported operators
 5. Missing required condition properties (for example `path`)
 6. Invalid rule definitions (for example `result = $null`)
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
