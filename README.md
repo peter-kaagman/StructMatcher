@@ -86,10 +86,11 @@ Each rule has:
 
 ## Rule Behavior
 
-1. Conditions inside one rule use AND logic.
-2. If `operator` is omitted, `Equals` is used.
-3. An unknown operator throws an error.
-4. Duplicate result values are returned once.
+1. `Conditions` inside one `ConditionSet` use explicit AND logic.
+2. `ConditionSets` inside one `RuleSet` use implicit OR logic.
+3. If an `operator` is omitted, `Equals` is used.
+4. An unknown operator throws an error.
+5. Duplicate result values are returned once.
 
 ## missingOk
 
@@ -104,7 +105,7 @@ When `missingOk` is `true`, or when it is omitted, a negative condition is consi
 
 When `missingOk` is `false`, the path must exist for the negative condition to be met.
 
-`missingOk` only affects negative operators. Positive operators always require the path to exist.
+The flag `missingOk` only affects negative operators. Positive operators always require the path to exist to match.
 
 The default value is `true`. Set `missingOk` to `false` to opt in to strict missing-path handling.
 
@@ -153,7 +154,54 @@ Each condition supports:
 3. `check` (required): value to compare against
 4. `missingOk` (optional): controls missing-path behavior for negative operators; defaults to `true`
 
-Supported operators:
+## Operator examples
+
+### Equeals
+
+Tests for exact equality.
+
+```powershell:q
+$data = @{ 
+    person = @{ 
+        department = "Finance" 
+    } 
+}
+$ruleset = @{
+    conditions = @(
+        @{
+            path     = @("person", "department")
+            operator = "Equals"
+            check    = "Finance"
+        }
+    )
+    result = "Finance department"
+}
+Invoke-StructMatcher -Rules $rules -Data $data
+# Returns: @('Finance department')
+```
+### NotEqueals
+
+Tests for exact equality.
+
+```powershell
+$data = @{ 
+    person = @{ 
+        department = "Finance" 
+    } 
+}
+$ruleset = @{
+    conditions = @(
+        @{
+            path     = @("person", "department")
+            operator = "NotEquals"
+            check    = "Finance"
+        }
+    )
+    result = "Not Finance department"
+}
+Invoke-StructMatcher -Rules $rules -Data $data
+# Returns: @('Not Finance department')
+```
 
 | Operator | Purpose |
 |---|---|
@@ -178,7 +226,7 @@ Note for membership operators (`Contains`, `NotContains`, `In`, `NotIn`):
 2. JSON array strings such as `"[\"a\",\"b\"]"` are parsed automatically.
 3. Nested single-item arrays are flattened.
 
-## Examples
+## Rule Examples
 
 ### Basic usage
 

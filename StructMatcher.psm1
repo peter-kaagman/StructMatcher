@@ -1,3 +1,39 @@
+<#
+.SYNOPSIS
+    StructMatcher - Evaluate declarative rule sets against structured data.
+
+.DESCRIPTION
+    StructMatcher evaluates one or more rules against structured input data
+    and returns the results of all matching rules.
+
+    Supported data formats:
+      - Hashtable
+      - PSCustomObject
+      - JSON text
+
+    Supported rule formats:
+      - Rule object
+      - Rule collections
+      - JSON object
+      - JSON array
+
+    Compatible with:
+      - Windows PowerShell 5.1
+      - PowerShell 7+
+
+.NOTES
+    Project : StructMatcher
+    Version : 2.0.0
+    Author  : Peter Kaagman
+    License : MIT
+    GitHub  : https://github.com/structmatcher
+
+    Design goals:
+      - Data-driven rule evaluation
+      - No scriptblock execution
+      - Predictable behavior
+      - PowerShell 5.1 compatibility
+#>
 function Get-InfoFromStruct {
     <#
     Traverses a nested object structure (hashtables, PSCustomObjects, 
@@ -50,27 +86,31 @@ param (
 
 function ConvertTo-NormalizedArray {
     <#
-    Contains, NoContains, In, NotIn operators require the 
-    found value to be an array. This function normalizes 
-    the input to an array, handling strings and nested arrays 
+    Contains, NoContains, In, NotIn operators require the
+    found value to be an array. This function normalizes
+    the input to an array, handling strings and nested arrays
     appropriately.
     #>
-param($Value)
+
+    param($Value)
 
     if ($null -eq $Value) {
-        return @()
+        return ,@()
     }
 
     if ($Value -is [string]) {
         try {
             $parsed = $null
 
-            if ($Value.Trim().StartsWith("[") -and $Value.Trim().EndsWith("]")) {
+            if (
+                $Value.Trim().StartsWith("[") -and
+                $Value.Trim().EndsWith("]")
+            ) {
                 $parsed = $Value | ConvertFrom-Json -ErrorAction Stop
-            }
 
-            if ($parsed -is [array]) {
-                $Value = $parsed
+                # PS7 returns a scalar for single-item JSON arrays.
+                # Force the result back into an array.
+                $Value = @($parsed)
             }
             else {
                 $Value = $Value -split ','
@@ -85,29 +125,15 @@ param($Value)
     }
 
     while (
-    $Value.Count -eq 1 -and
-    $Value[0] -is [array]
+        $Value.Count -eq 1 -and
+        $Value[0] -is [array]
     ) {
         $Value = $Value[0]
     }
 
-    return $Value
+    return ,$Value
 }
-
 function ConvertTo-NormalizedStructure {
-    <#
-    .SYNOPSIS
-    Normalizes input for StructMatcher.
-
-    .DESCRIPTION
-    StructMatcher operates on traverseable object structures.
-    Supported input formats are:
-    - Hashtable
-    - PSCustomObject
-    - JSON text (automatically converted)
-
-    No further conversion is performed.
-    #>
 
     [CmdletBinding()]
     param(
@@ -116,22 +142,10 @@ function ConvertTo-NormalizedStructure {
         $InputObject
     )
 
-    # Already usable
-    if (
-    $InputObject -is [hashtable] -or
-    $InputObject -is [pscustomobject] -or
-    (
-    $InputObject -is [System.Collections.IEnumerable] -and
-    $InputObject -isnot [string]
-    )
-    ) {
-        return $InputObject
-    }
-
     # JSON text
     if ($InputObject -is [string]) {
 
-        if ([string]::IsNullOrWhiteSpace($InputObject)) {
+        if ([string]::IsNullOrWhiteSpace($InputObject)){
             throw "Input cannot be an empty string."
         }
 
@@ -143,31 +157,23 @@ function ConvertTo-NormalizedStructure {
         }
     }
 
-    throw "Unsupported input type [$($InputObject.GetType().FullName)]. Supported types are Hashtable, PSCustomObject, arrays, and JSON text."
-}
-
-function Invoke-StructMatcher {
-param (
-        [Parameter(Mandatory)] $rules,
-        [Parameter(Mandatory)] $data
-    )
-    # Convert JSON input to a traverseable PowerShell structure.
-    # Existing dictionaries, objects, and collections are retained.
-    $rules = ConvertTo-NormalizedStructure $rules
-    $data = ConvertTo-NormalizedStructure $data
-    # Keep matching results in insertion order while preventing duplicates.
-    $result = [System.Collections.Generic.List[object]]::new()
-    foreach ($rule in $rules) {
-        # Write-Host "Evaluating rule: $($rule | ConvertTo-Json -Depth 5 -Compress)"
-        # Write-Host "Against data: $($data | ConvertTo-Json -Depth 5 -Compress)"
-        $reply = Test-ConditionSet -rule $rule -data $data
-        if ($null -ne $reply -and -not $result.Contains($reply)) {
-            [void]$result.Add($reply)
-        }
+    # Hashtable
+    if ($InputObject -is [hashtable]) {
+        return $InputObject
     }
-    return $result.ToArray()
-}
 
+    # PSCustomObject
+    if ($InputObject -is [pscustomobject]) {
+        return $InputObject
+    }
+
+    # Collection
+    if ($InputObject -is [System.Collections.IEnumerable]) {
+        return $InputObject
+    }
+
+    throw "Unsupported input type [$($InputObject.GetType().FullName)]. Supported types are Hashtable, PSCustomObject, collections and JSON text."
+}
 
 function Test-ConditionSet {
 param (
@@ -265,6 +271,77 @@ param (
     return $null
 }
 
+function Test-RulePropertyNames {
+param(
+        [Parameter(Mandatory)] $Rules
+    )
 
-# Export-ModuleMember -Function Test-ConditionSet
+    $validRuleProperties = @( 'conditions', 'result')
+
+    $validConditionProperties = @( 'path', 'operator', 'check', 'missingOk')
+    foreach ($rule in @($rules)) {
+
+        $rulePropertyNames =
+        if ($rule -is [System.Collections.IDictionary]) {
+            @($rule.Keys)
+        } else {
+            @($rule.PSObject.Properties.Name)
+        }
+
+        $unknownRuleProperties =
+        $rulePropertyNames |
+        Where-Object { $_ -notin $validRuleProperties }
+
+        if ($unknownRuleProperties) {
+            throw "Unknown rule properties: $($unknownRuleProperties -join ', ')"
+        }
+
+        foreach ($condition in @($rule.conditions)) {
+
+            $conditionPropertyNames =
+            if ($condition -is [System.Collections.IDictionary]) {
+                @($condition.Keys)
+            } else {
+                @($condition.PSObject.Properties.Name)
+            }
+
+            $unknownConditionProperties =
+            $conditionPropertyNames |
+            Where-Object { $_ -notin $validConditionProperties }
+
+            if ($unknownConditionProperties) {
+                throw "Unknown condition properties: $($unknownConditionProperties -join ', ')"
+            }
+        }
+    }
+}
+
+function Invoke-StructMatcher {
+param (
+        [Parameter(Mandatory)] $rules,
+        [Parameter(Mandatory)] $data
+    )
+    # Convert JSON input to a traverseable PowerShell structure.
+    # Existing dictionaries, objects, and collections are retained.
+    $rules = ConvertTo-NormalizedStructure $rules
+    if ($null -eq $rules) {
+        return @()
+    }
+    # $data = ConvertTo-NormalizedStructure $data
+
+    # Check if rule property names are valid
+    Test-RulePropertyNames -rules $rules
+
+    # Keep matching results in insertion order while preventing duplicates.
+    $result = [System.Collections.Generic.List[object]]::new()
+    foreach ($rule in $rules) {
+        $reply = Test-ConditionSet -rule $rule -data $data
+        if ($null -ne $reply -and -not $result.Contains($reply)) {
+            [void]$result.Add($reply)
+        }
+    }
+    return $result.ToArray()
+}
+
+# Public API
 Export-ModuleMember -Function Invoke-StructMatcher
