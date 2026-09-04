@@ -327,9 +327,9 @@ param (
     if ($null -eq $rules) {
         return @()
     }
-    # $data = ConvertTo-NormalizedStructure $data
+    $data = ConvertTo-NormalizedStructure $data
 
-    # Check if rule property names are valid
+    #Check if rule property names are valid
     Test-RulePropertyNames -rules $rules
 
     # Keep matching results in insertion order while preventing duplicates.
