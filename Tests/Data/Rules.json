@@ -1,0 +1,12 @@
+[
+  {
+    "conditions": [
+      {
+        "path": ["person", "department"],
+        "operator": "Equals",
+        "check": "Finance"
+      }
+    ],
+    "result": "Finance"
+  }
+]

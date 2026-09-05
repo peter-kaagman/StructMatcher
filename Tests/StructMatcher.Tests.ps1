@@ -483,7 +483,48 @@ Describe "Invoke-StructMatcher" {
             $results = @(Invoke-StructMatcher -Rules $Rules -Data $hashtableData)
 
             $results | Should -Be $Expected
-        }  
+        }
+
+        It "supports rules loaded from a file using Get-Content -Raw" {
+
+            $rules = Get-Content `
+            "$PSScriptRoot\Data\Rules.json" `
+            -Raw
+
+            $rules.GetType().FullName |
+            Should -Be 'System.String'
+
+            $results = @(Invoke-StructMatcher `
+                -Rules $rules `
+                -Data $hashtableData)
+
+            $results | Should -Be @("Finance")
+        }
+
+        It "supports rules supplied as PSCustomObject" {
+            $rules = @'
+[
+    {
+        "conditions": [
+            {
+                "path": ["person", "department"],
+                "operator": "Equals",
+                "check": "Finance"
+            }
+        ],
+        "result": "Finance"
+    }
+]
+'@ | ConvertFrom-Json
+
+            $results = @(Invoke-StructMatcher `
+                -Rules $rules `
+                -Data $hashtableData)
+
+            $results | Should -Be @("Finance")
+        }
+
+
     }
 
     # Operator evaluation

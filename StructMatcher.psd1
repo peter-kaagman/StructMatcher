@@ -1,11 +1,11 @@
 @{
 	# Module metadata
 	ModuleVersion = '2.0.1'
-	GUID = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d'
+	GUID = 'd0cdddc2-5ef9-4c89-bdc5-b4048414ac74'
 	Author = 'Peter Kaagman'
 	CompanyName = 'Atlas College'
-	Copyright = '(c) 2025 Peter Kaagman. Licensed under MIT License.'
-	Description = 'Module for testing conditions against nested hashtable structures and retrieving values from them.'
+	Copyright = '(c) 2026 Peter Kaagman. Licensed under MIT License.'
+	Description = 'Evaluate declarative rule sets against nested structured data and return matching results. Supports JSON, hashtables, PSCustomObjects, and iterable rule collections.'
 
 	# Module components
 	RootModule = 'StructMatcher.psm1'
@@ -49,7 +49,8 @@ Exports Invoke-StructMatcher for evaluating conditions against nested structures
 - Outer loop for rule evaluation not within the function, but rather in the calling context.
 - Input data is expected to be a hashtable or PSCustomObject.
 '@
-			ProjectUri = 'https://github.com/peter-kaagman/Atlas-HelloID-Scripts'
+			ProjectUri = 'https://github.com/peter-kaagman/StructMatcher'
+			LicenseUri = 'https://github.com/peter-kaagman/StructMatcher/blob/main/LICENSE'
 		}
 	}
 }

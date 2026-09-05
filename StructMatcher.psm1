@@ -23,10 +23,10 @@
 
 .NOTES
     Project : StructMatcher
-    Version : 2.0.0
+    Version : 2.0.1
     Author  : Peter Kaagman
     License : MIT
-    GitHub  : https://github.com/structmatcher
+    GitHub  : https://github.com/peter-kaagman/structmatcher
 
     Design goals:
       - Data-driven rule evaluation
@@ -271,7 +271,7 @@ param (
     return $null
 }
 
-function Test-RulePropertyNames {
+function Test-RulePropertyName {
 param(
         [Parameter(Mandatory)] $Rules
     )
@@ -330,7 +330,7 @@ param (
     $data = ConvertTo-NormalizedStructure $data
 
     #Check if rule property names are valid
-    Test-RulePropertyNames -rules $rules
+    Test-RulePropertyName -rules $rules
 
     # Keep matching results in insertion order while preventing duplicates.
     $result = [System.Collections.Generic.List[object]]::new()
