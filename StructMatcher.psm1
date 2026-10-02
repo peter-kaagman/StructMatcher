@@ -133,6 +133,7 @@ function ConvertTo-NormalizedArray {
 
     return ,$Value
 }
+
 function ConvertTo-NormalizedStructure {
 
     [CmdletBinding()]
@@ -175,10 +176,89 @@ function ConvertTo-NormalizedStructure {
     throw "Unsupported input type [$($InputObject.GetType().FullName)]. Supported types are Hashtable, PSCustomObject, collections and JSON text."
 }
 
+function Test-Condition{
+param (
+        [Parameter(Mandatory)] $Condition,
+        [Parameter(Mandatory)] $Data
+    )
+    # ensure path exists
+    if ( [string]::IsNullOrWhitespace($condition.path)) {
+        throw "Condition is missing a 'path' property."
+    }
+    # ensure path is an array  
+    $path = @($condition.path -split '\.')
+    $check = $condition.check
+    # If no operator is specified, default to Equals
+    $operator = if ($condition.operator) { 
+        $condition.operator 
+    } else { 
+        "Equals" 
+    }
+    # missingOk default to true if not specified
+    $missingOk = if ($null -ne $condition.missingOk) {
+        $condition.missingOk
+    } else {
+        $true
+    }
+    $result = Get-InfoFromStruct -path $path -data $data
+    $value = $result.Value
+    $isFound = $result.Found
+    $conditionMet = 
+    switch ($operator) {
+        # Positive operators => node should exist and match the condition
+        # missingOk is ignored for positive operators
+        "Equals"         { ($isFound) -and ( $value -eq $check) }
+        "Contains"       { ($isFound) -and ( (ConvertTo-NormalizedArray $value) -contains $check)}
+        "In"             { ($isFound) -and ( $value -in (ConvertTo-NormalizedArray $check)) }
+        "Like"           { ($isFound) -and ( $value -like $check) }
+        "Match"          { ($isFound) -and ( $value -match $check) }
+        "GreaterThan"    { ($isFound) -and ( $value -gt $check) }
+        "LessThan"       { ($isFound) -and ( $value -lt $check) }
+        "GreaterOrEqual" { ($isFound) -and ( $value -ge $check) }
+        "LessOrEqual"    { ($isFound) -and ( $value -le $check) }
+
+        # Negative operators => result depends on missingOk flag
+        "NotEquals" {
+            if ($missingOk) { 
+                (-not $isFound) -or ($value -ne $check) }
+            else { 
+                $isFound -and ($value -ne $check) }
+        }
+        "NotContains" {
+            if ($missingOk) { 
+                (-not $isFound) -or ((ConvertTo-NormalizedArray $value) -notcontains $check) }
+            else { 
+                $isFound -and ((ConvertTo-NormalizedArray $value) -notcontains $check) }
+        }
+        "NotIn" {
+            if ($missingOk) { 
+                (-not $isFound) -or ($value -notin (ConvertTo-NormalizedArray $check)) }
+            else { 
+                $isFound -and ($value -notin (ConvertTo-NormalizedArray $check)) }
+        }
+        "NotLike" {
+            if ($missingOk) { 
+                (-not $isFound) -or ($value -notlike $check) }
+            else { 
+                $isFound -and ($value -notlike $check) }
+        }
+        "NotMatch" {
+            if ($missingOk) { 
+                (-not $isFound) -or ($value -notmatch $check) }
+            else { 
+                $isFound -and ($value -notmatch $check) }
+        }
+        default { 
+            throw "Unsupported operator [$operator]. Supported operators are: Equals, NotEquals, Contains, NotContains, In, NotIn, Like, NotLike, Match, NotMatch, GreaterThan, LessThan, GreaterOrEqual, LessOrEqual."
+        }
+    }
+    return $conditionMet
+}
+
 function Test-ConditionSet {
 param (
-        [Parameter(Mandatory)] $rule,
-        [Parameter(Mandatory)] $data
+        [Parameter(Mandatory)] $Rule,
+        [Parameter(Mandatory)] $Data
     )
 
     # Ensure rule.result is not null
@@ -188,77 +268,7 @@ param (
     # Default to true, so that if no conditions are specified, the rule is considered met.
     $allMet = $true
     foreach ($condition in $rule.conditions) {
-        # ensure path exists
-        if ( [string]::IsNullOrWhitespace($condition.path)) {
-            throw "Condition is missing a 'path' property."
-        }
-        # ensure path is an array  
-        $path = @($condition.path -split '\.')
-        $check = $condition.check
-        # If no operator is specified, default to Equals
-        $operator = if ($condition.operator) { 
-            $condition.operator 
-        } else { 
-            "Equals" 
-        }
-        # missingOk default to true if not specified
-        $missingOk = if ($null -ne $condition.missingOk) {
-            $condition.missingOk
-        } else {
-            $true
-        }
-        $result = Get-InfoFromStruct -path $path -data $data
-        $value = $result.Value
-        $isFound = $result.Found
-        $conditionMet = 
-        switch ($operator) {
-            # Positive operators => node should exist and match the condition
-            # missingOk is ignored for positive operators
-            "Equals"         { ($isFound) -and ( $value -eq $check) }
-            "Contains"       { ($isFound) -and ( (ConvertTo-NormalizedArray $value) -contains $check)}
-            "In"             { ($isFound) -and ( $value -in (ConvertTo-NormalizedArray $check)) }
-            "Like"           { ($isFound) -and ( $value -like $check) }
-            "Match"          { ($isFound) -and ( $value -match $check) }
-            "GreaterThan"    { ($isFound) -and ( $value -gt $check) }
-            "LessThan"       { ($isFound) -and ( $value -lt $check) }
-            "GreaterOrEqual" { ($isFound) -and ( $value -ge $check) }
-            "LessOrEqual"    { ($isFound) -and ( $value -le $check) }
-
-            # Negative operators => result depends on missingOk flag
-            "NotEquals" {
-                if ($missingOk) { 
-                    (-not $isFound) -or ($value -ne $check) }
-                else { 
-                    $isFound -and ($value -ne $check) }
-            }
-            "NotContains" {
-                if ($missingOk) { 
-                    (-not $isFound) -or ((ConvertTo-NormalizedArray $value) -notcontains $check) }
-                else { 
-                    $isFound -and ((ConvertTo-NormalizedArray $value) -notcontains $check) }
-            }
-            "NotIn" {
-                if ($missingOk) { 
-                    (-not $isFound) -or ($value -notin (ConvertTo-NormalizedArray $check)) }
-                else { 
-                    $isFound -and ($value -notin (ConvertTo-NormalizedArray $check)) }
-            }
-            "NotLike" {
-                if ($missingOk) { 
-                    (-not $isFound) -or ($value -notlike $check) }
-                else { 
-                    $isFound -and ($value -notlike $check) }
-            }
-            "NotMatch" {
-                if ($missingOk) { 
-                    (-not $isFound) -or ($value -notmatch $check) }
-                else { 
-                    $isFound -and ($value -notmatch $check) }
-            }
-            default { 
-                throw "Unsupported operator [$operator]. Supported operators are: Equals, NotEquals, Contains, NotContains, In, NotIn, Like, NotLike, Match, NotMatch, GreaterThan, LessThan, GreaterOrEqual, LessOrEqual."
-            }
-        }
+        $conditionMet = Test-Condition -Condition $condition -Data $data
         # Doing an AND so bail out if any condition fails
         if (-not $conditionMet) {
             $allMet = $false
@@ -276,7 +286,7 @@ param(
         [Parameter(Mandatory)] $Rules
     )
 
-    $validRuleProperties = @( 'conditions', 'result')
+    $validRuleProperties = @( 'conditions', 'result', 'metadata')
 
     $validConditionProperties = @( 'path', 'operator', 'check', 'missingOk')
     foreach ($rule in @($rules)) {
@@ -288,6 +298,7 @@ param(
             @($rule.PSObject.Properties.Name)
         }
 
+        # Check if a ConditionSet has valid properties
         $unknownRuleProperties =
         $rulePropertyNames |
         Where-Object { $_ -notin $validRuleProperties }
@@ -298,6 +309,7 @@ param(
 
         foreach ($condition in @($rule.conditions)) {
 
+            # Check if a Condition has valid properties
             $conditionPropertyNames =
             if ($condition -is [System.Collections.IDictionary]) {
                 @($condition.Keys)
@@ -335,7 +347,7 @@ param (
     # Keep matching results in insertion order while preventing duplicates.
     $result = [System.Collections.Generic.List[object]]::new()
     foreach ($rule in $rules) {
-        $reply = Test-ConditionSet -rule $rule -data $data
+        $reply = Test-ConditionSet -Rule $rule -Data $data
         if ($null -ne $reply -and -not $result.Contains($reply)) {
             [void]$result.Add($reply)
         }
@@ -344,4 +356,8 @@ param (
 }
 
 # Public API
-Export-ModuleMember -Function Invoke-StructMatcher
+Export-ModuleMember -Function @(
+    'Invoke-StructMatcher',
+    'Test-ConditionSet',
+    'Test-Condition'
+)

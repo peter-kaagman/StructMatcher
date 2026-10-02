@@ -825,4 +825,77 @@ Describe "Invoke-StructMatcher" {
             } | Should -Throw "Input cannot be an empty string.*"
         }
     }
+    Context "Test-Condition" {
+        
+        It "returns true for a matching condition" {
+            
+            $condition = @{
+                path     = @("person", "department")
+                operator = "Equals"
+                check    = "Finance"
+            }
+            
+            Test-Condition `
+            -Condition $condition `
+            -Data $hashtableData |
+            Should -BeTrue
+        }
+        
+        It "returns false for a non-matching condition" {
+            
+            $condition = @{
+                path     = @("person", "department")
+                operator = "Equals"
+                check    = "IT"
+            }
+            
+            Test-Condition `
+            -Condition $condition `
+            -Data $hashtableData |
+            Should -BeFalse
+        }
+        
+        It "supports dotted paths" {
+            
+            $condition = @{
+                path     = "person.address.city"
+                operator = "Equals"
+                check    = "Alkmaar"
+            }
+            
+            Test-Condition `
+            -Condition $condition `
+            -Data $hashtableData |
+            Should -BeTrue
+        }
+        
+        It "throws when path is missing" {
+            
+            $condition = @{
+                operator = "Equals"
+                check    = "Finance"
+            }
+            
+            {
+                Test-Condition `
+                -Condition $condition `
+                -Data $hashtableData
+            } | Should -Throw
+        }
+        
+        It "throws for an unsupported operator" {
+            
+            $condition = @{
+                path     = "person.department"
+                operator = "Flubber"
+                check    = "Finance"
+            }
+            
+            {
+                Test-Condition `
+                -Condition $condition `
+                -Data $hashtableData
+            } | Should -Throw
+        }
+    }    
 }
